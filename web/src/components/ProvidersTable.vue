@@ -17,8 +17,8 @@ defineProps<{
     <table class="data-table">
       <thead>
         <tr>
-          <th scope="col">Name</th>
-          <th scope="col">Protocol</th>
+          <th scope="col">Provider</th>
+          <th scope="col">协议</th>
           <th scope="col">Endpoint</th>
         </tr>
       </thead>
@@ -40,31 +40,49 @@ defineProps<{
 
 .data-table {
   width: 100%;
-  border-collapse: collapse;
+  min-width: 620px;
+  border-collapse: separate;
+  border-spacing: 0 10px;
 }
 
 .data-table th,
 .data-table td {
   padding: 14px 16px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
   text-align: left;
 }
 
 .data-table th {
-  color: rgba(148, 163, 184, 0.92);
-  font-size: 0.8rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .data-table td {
-  color: #e2e8f0;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(29, 27, 24, 0.88);
+  color: var(--text-primary);
   line-height: 1.6;
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast);
 }
 
-.data-table tbody tr:hover {
-  background: rgba(15, 23, 42, 0.58);
+.data-table td:first-child {
+  border-left: 1px solid var(--border-color);
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.data-table td:last-child {
+  border-right: 1px solid var(--border-color);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.data-table tbody tr:hover td {
+  border-color: var(--border-hover);
+  background: var(--bg-hover);
 }
 
 .data-table__primary {
@@ -72,7 +90,9 @@ defineProps<{
 }
 
 .data-table__endpoint {
-  color: #cbd5e1;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
   word-break: break-all;
 }
 
@@ -80,9 +100,10 @@ defineProps<{
   display: grid;
   place-items: center;
   min-height: 220px;
-  border: 1px dashed rgba(148, 163, 184, 0.18);
-  border-radius: 18px;
-  color: rgba(148, 163, 184, 0.9);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
   text-align: center;
+  background: rgba(29, 27, 24, 0.52);
 }
 </style>

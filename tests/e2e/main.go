@@ -32,14 +32,45 @@ func main() {
 	run("Healthz", testHealthz)
 	run("API Providers", testProviders)
 	run("API Routes", testRoutes)
-	run("API Logs", testLogs)
-	run("Claude Direct (non-stream)", testClaudeDirect)
-	run("Claude Direct (stream)", testClaudeStream)
-	run("OpenAI→Claude (non-stream)", testOpenAIToClaude)
-	run("OpenAI→Claude (stream)", testOpenAIToClaudeStream)
+
+	run("Claude→Claude (直通)", func() error {
+		return testClaude("/v1/messages", "claude-sonnet-4-5-thinking", false)
+	})
+	run("Claude→Claude (流式)", func() error {
+		return testClaude("/v1/messages", "claude-sonnet-4-5-thinking", true)
+	})
+
+	run("OpenAI→Claude (转译)", func() error {
+		return testOpenAI("/v1/chat/completions", "claude-sonnet-4-5-thinking", false)
+	})
+	run("OpenAI→Claude (流式转译)", func() error {
+		return testOpenAI("/v1/chat/completions", "claude-sonnet-4-5-thinking", true)
+	})
+
+	run("OpenAI→OpenAI (直通)", func() error {
+		return testOpenAI("/v1/chat/completions", "gpt-5.4", false)
+	})
+	run("OpenAI→OpenAI (流式)", func() error {
+		return testOpenAI("/v1/chat/completions", "gpt-5.4", true)
+	})
+
+	run("Claude→OpenAI (转译)", func() error {
+		return testClaude("/v1/messages", "gpt-5.4", false)
+	})
+
+	run("OpenAI→Gemini (转译)", func() error {
+		return testOpenAI("/v1/chat/completions", "gemini-2.5-flash-lite", false)
+	})
+	run("OpenAI→Gemini (流式转译)", func() error {
+		return testOpenAI("/v1/chat/completions", "gemini-2.5-flash-lite", true)
+	})
+
+	run("Claude→Gemini (转译)", func() error {
+		return testClaude("/v1/messages", "gemini-2.5-flash-lite", false)
+	})
 
 	fmt.Printf("\n════════════════════════════════\n")
-	fmt.Printf("  PASSED: %d  FAILED: %d\n", passed, failed)
+	fmt.Printf("  PASSED: %d  FAILED: %d  TOTAL: %d\n", passed, failed, passed+failed)
 	fmt.Printf("════════════════════════════════\n")
 
 	if failed > 0 {
@@ -52,13 +83,10 @@ func testHealthz() error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("status %d", resp.StatusCode)
-	}
+	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
 	fmt.Printf("  %s\n", body)
-	return nil
+	return assertStatus(resp, 200)
 }
 
 func testProviders() error {
@@ -66,7 +94,7 @@ func testProviders() error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
 	fmt.Printf("  %s\n", body)
 	return nil
@@ -77,129 +105,67 @@ func testRoutes() error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
 	fmt.Printf("  %s\n", body)
 	return nil
 }
 
-func testLogs() error {
-	resp, err := http.Get(baseURL + "/api/logs")
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	fmt.Printf("  %s\n", truncate(string(body), 200))
-	return nil
-}
-
-func testClaudeDirect() error {
+func testClaude(path, model string, stream bool) error {
 	payload := map[string]any{
-		"model":      "claude-sonnet-4-5-thinking",
-		"max_tokens": 128,
-		"messages":   []map[string]string{{"role": "user", "content": "Say hello in exactly one word."}},
-	}
-	resp, err := postJSON(baseURL+"/v1/messages", payload)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	fmt.Printf("  Status: %d\n", resp.StatusCode)
-	fmt.Printf("  %s\n", truncate(string(body), 500))
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("status %d: %s", resp.StatusCode, body)
-	}
-	return nil
-}
-
-func testClaudeStream() error {
-	payload := map[string]any{
-		"model":      "claude-sonnet-4-5-thinking",
-		"max_tokens": 128,
-		"stream":     true,
+		"model":      model,
+		"max_tokens": 64,
 		"messages":   []map[string]string{{"role": "user", "content": "Say hi in one word."}},
 	}
-	resp, err := postJSON(baseURL+"/v1/messages", payload)
+	if stream {
+		payload["stream"] = true
+	}
+	resp, err := postJSON(baseURL+path, payload)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	ct := resp.Header.Get("Content-Type")
-	fmt.Printf("  Status: %d  Content-Type: %s\n", resp.StatusCode, ct)
+	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
-	lines := strings.Split(string(body), "\n")
-	shown := 0
-	for _, line := range lines {
-		if strings.TrimSpace(line) != "" && shown < 8 {
-			fmt.Printf("  %s\n", truncate(line, 120))
-			shown++
-		}
+	fmt.Printf("  Status: %d  Content-Type: %s\n", resp.StatusCode, resp.Header.Get("Content-Type"))
+	if stream {
+		printStreamLines(body, 6)
+	} else {
+		fmt.Printf("  %s\n", truncate(string(body), 300))
 	}
-	if shown < len(lines) {
-		fmt.Printf("  ... (%d more lines)\n", len(lines)-shown)
-	}
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("status %d", resp.StatusCode)
-	}
-	return nil
+	return assertStatus(resp, 200)
 }
 
-func testOpenAIToClaude() error {
+func testOpenAI(path, model string, stream bool) error {
 	payload := map[string]any{
-		"model":      "claude-sonnet-4-5-thinking",
-		"max_tokens": 128,
-		"messages":   []map[string]string{{"role": "user", "content": "Say hello in exactly one word."}},
+		"model":      model,
+		"max_tokens": 64,
+		"messages":   []map[string]string{{"role": "user", "content": "Say hi in one word."}},
 	}
-	resp, err := postJSON(baseURL+"/v1/chat/completions", payload)
+	if stream {
+		payload["stream"] = true
+	}
+	resp, err := postJSON(baseURL+path, payload)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
-	fmt.Printf("  Status: %d\n", resp.StatusCode)
-	fmt.Printf("  %s\n", truncate(string(body), 500))
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("status %d: %s", resp.StatusCode, body)
-	}
-	var result map[string]any
-	if err := json.Unmarshal(body, &result); err != nil {
-		return fmt.Errorf("invalid JSON: %v", err)
-	}
-	if _, ok := result["choices"]; !ok {
-		return fmt.Errorf("expected 'choices' in OpenAI response")
-	}
-	return nil
-}
-
-func testOpenAIToClaudeStream() error {
-	payload := map[string]any{
-		"model":      "claude-sonnet-4-5-thinking",
-		"max_tokens": 128,
-		"stream":     true,
-		"messages":   []map[string]string{{"role": "user", "content": "Say hi."}},
-	}
-	resp, err := postJSON(baseURL+"/v1/chat/completions", payload)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	ct := resp.Header.Get("Content-Type")
-	fmt.Printf("  Status: %d  Content-Type: %s\n", resp.StatusCode, ct)
-	body, _ := io.ReadAll(resp.Body)
-	lines := strings.Split(string(body), "\n")
-	shown := 0
-	for _, line := range lines {
-		if strings.TrimSpace(line) != "" && shown < 8 {
-			fmt.Printf("  %s\n", truncate(line, 120))
-			shown++
+	fmt.Printf("  Status: %d  Content-Type: %s\n", resp.StatusCode, resp.Header.Get("Content-Type"))
+	if stream {
+		printStreamLines(body, 6)
+	} else {
+		fmt.Printf("  %s\n", truncate(string(body), 300))
+		if resp.StatusCode == 200 {
+			var result map[string]any
+			if err := json.Unmarshal(body, &result); err != nil {
+				return fmt.Errorf("invalid JSON: %v", err)
+			}
+			if _, ok := result["choices"]; !ok {
+				return fmt.Errorf("expected 'choices' in response")
+			}
 		}
 	}
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("status %d", resp.StatusCode)
-	}
-	return nil
+	return assertStatus(resp, 200)
 }
 
 func postJSON(url string, payload any) (*http.Response, error) {
@@ -208,6 +174,33 @@ func postJSON(url string, payload any) (*http.Response, error) {
 		return nil, err
 	}
 	return http.Post(url, "application/json", bytes.NewReader(data))
+}
+
+func assertStatus(resp *http.Response, expected int) error {
+	if resp.StatusCode != expected {
+		return fmt.Errorf("expected status %d, got %d", expected, resp.StatusCode)
+	}
+	return nil
+}
+
+func printStreamLines(body []byte, max int) {
+	lines := strings.Split(string(body), "\n")
+	shown := 0
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" && shown < max {
+			fmt.Printf("  %s\n", truncate(line, 120))
+			shown++
+		}
+	}
+	total := 0
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			total++
+		}
+	}
+	if total > shown {
+		fmt.Printf("  ... (%d more lines)\n", total-shown)
+	}
 }
 
 func truncate(s string, max int) string {

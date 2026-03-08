@@ -35,12 +35,22 @@ defineProps<{
   display: flex;
   flex-direction: column;
   gap: 18px;
-  min-height: 320px;
+  min-height: 0;
   padding: 24px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 24px;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.72));
-  box-shadow: 0 20px 46px rgba(2, 6, 23, 0.28);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(180deg, rgba(29, 27, 24, 0.98), rgba(21, 20, 18, 0.94));
+  box-shadow: var(--shadow-md);
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.section-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-lg);
 }
 
 .section-card__header {
@@ -52,57 +62,61 @@ defineProps<{
 
 .section-card__title {
   margin: 0;
-  color: #f8fafc;
-  font-family: 'Sora', 'Segoe UI', sans-serif;
-  font-size: 1.18rem;
+  color: var(--text-primary);
+  font-size: 1.12rem;
   font-weight: 700;
 }
 
 .section-card__subtitle {
   margin: 8px 0 0;
-  color: rgba(148, 163, 184, 0.92);
-  font-size: 0.92rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }
 
 .section-card__count {
-  display: flex;
+  display: inline-flex;
   flex-direction: column;
   align-items: flex-end;
-  min-width: 82px;
-  color: #93c5fd;
+  justify-content: center;
+  min-width: 90px;
+  padding: 10px 12px;
+  border: 1px solid rgba(139, 134, 128, 0.24);
+  border-radius: var(--radius-md);
+  background: rgba(139, 134, 128, 0.12);
 }
 
 .section-card__count span {
-  font-family: 'Sora', 'Segoe UI', sans-serif;
-  font-size: 1.52rem;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 1.3rem;
   font-weight: 800;
   line-height: 1;
 }
 
 .section-card__count small {
   margin-top: 4px;
-  color: rgba(148, 163, 184, 0.9);
+  color: var(--text-tertiary);
   font-size: 0.82rem;
 }
 
 .section-card__error {
   margin: 0;
   padding: 12px 14px;
-  border: 1px solid rgba(248, 113, 113, 0.24);
-  border-radius: 14px;
-  color: #fecaca;
-  background: rgba(127, 29, 29, 0.28);
+  border: 1px solid var(--status-danger-border);
+  border-radius: var(--radius-md);
+  color: var(--status-danger-text);
+  background: var(--bg-danger-soft);
   line-height: 1.6;
 }
 
 .section-card__body {
   min-height: 0;
+  overflow: hidden;
 }
 
 @media (max-width: 720px) {
   .section-card {
     padding: 18px;
-    min-height: auto;
   }
 
   .section-card__header {
@@ -111,6 +125,7 @@ defineProps<{
 
   .section-card__count {
     align-items: flex-start;
+    width: 100%;
   }
 }
 </style>

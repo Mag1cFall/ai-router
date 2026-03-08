@@ -315,6 +315,7 @@ func applyAuthHeaders(req *http.Request, provider config.Provider, stream bool) 
 		q := req.URL.Query()
 		q.Set("key", provider.APIKey)
 		req.URL.RawQuery = q.Encode()
+		req.Header.Set("x-api-key", provider.APIKey)
 	}
 }
 

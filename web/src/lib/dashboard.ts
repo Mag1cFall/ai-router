@@ -131,6 +131,22 @@ function extractPayloadArray(payload: unknown, keys: string[]): unknown[] {
   }
 
   if (
+    keys.includes('providers') &&
+    ('name' in payload || 'provider' in payload) &&
+    ('endpoint' in payload || 'url' in payload || 'base_url' in payload)
+  ) {
+    return [payload]
+  }
+
+  if (
+    keys.includes('routes') &&
+    ('match_model' in payload || 'matchModel' in payload) &&
+    ('provider' in payload || 'provider_name' in payload || 'providerName' in payload)
+  ) {
+    return [payload]
+  }
+
+  if (
     keys.includes('logs') &&
     ('timestamp' in payload || 'time' in payload || 'created_at' in payload || 'model' in payload)
   ) {
@@ -138,6 +154,10 @@ function extractPayloadArray(payload: unknown, keys: string[]): unknown[] {
   }
 
   return []
+}
+
+function isVisibleLogProtocol(protocol: string): boolean {
+  return protocol !== 'admin' && protocol !== 'unknown'
 }
 
 function uniqueLogs(logs: RequestLogRecord[]): RequestLogRecord[] {
@@ -237,6 +257,7 @@ export function normalizeLogsResponse(payload: unknown): LogsResponseData {
         latencyMs,
       }
     })
+    .filter((log) => isVisibleLogProtocol(log.sourceProtocol))
 
   return {
     logs: uniqueLogs(logs),
@@ -355,18 +376,18 @@ export function getProtocolLabel(protocol: string): string {
   }
 }
 
-export function getStatusTone(statusCode: number): 'ok' | 'warn' | 'error' | 'idle' {
+export function getStatusTone(statusCode: number): 'success' | 'warning' | 'danger' | 'neutral' {
   if (statusCode >= 200 && statusCode < 300) {
-    return 'ok'
+    return 'success'
   }
 
-  if (statusCode >= 300 && statusCode < 400) {
-    return 'warn'
+  if (statusCode >= 400 && statusCode < 500) {
+    return 'warning'
   }
 
-  if (statusCode >= 400) {
-    return 'error'
+  if (statusCode >= 500) {
+    return 'danger'
   }
 
-  return 'idle'
+  return 'neutral'
 }

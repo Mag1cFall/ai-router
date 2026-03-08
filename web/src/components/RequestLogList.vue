@@ -14,166 +14,207 @@ defineProps<{
 
   <div v-else-if="logs.length === 0" class="empty-state">暂无日志数据。</div>
 
-  <ul v-else class="log-list" aria-live="polite">
-    <li v-for="log in logs" :key="log.id" class="log-item">
-      <div class="log-item__top">
-        <time :datetime="log.timestamp">{{ formatTimestamp(log.timestamp) }}</time>
-        <ProtocolBadge :protocol="log.sourceProtocol" />
-      </div>
+  <div v-else class="log-shell">
+    <div class="log-legend" aria-hidden="true">
+      <span>时间</span>
+      <span>协议</span>
+      <span>模型</span>
+      <span>Provider</span>
+      <span>状态码</span>
+      <span>延迟</span>
+    </div>
 
-      <div class="log-item__main">
-        <div class="log-item__target">
-          <span class="log-item__label">目标 Provider</span>
-          <strong>{{ log.provider }}</strong>
-        </div>
+    <ul class="log-list" aria-live="polite">
+      <li v-for="log in logs" :key="log.id" class="log-row">
+        <span class="log-row__cell log-row__cell--time" data-label="时间">
+          <time :datetime="log.timestamp">{{ formatTimestamp(log.timestamp) }}</time>
+        </span>
 
-        <div class="log-item__model">
-          <span class="log-item__label">模型</span>
+        <span class="log-row__cell log-row__cell--protocol" data-label="协议">
+          <ProtocolBadge :protocol="log.sourceProtocol" compact />
+        </span>
+
+        <span class="log-row__cell log-row__cell--model" data-label="模型">
           <code>{{ log.model }}</code>
-        </div>
+        </span>
 
-        <div class="log-item__metrics">
-          <span class="status-pill" :class="`status-pill--${getStatusTone(log.statusCode)}`">
+        <span class="log-row__cell log-row__cell--provider" data-label="Provider">
+          {{ log.provider }}
+        </span>
+
+        <span class="log-row__cell log-row__cell--status" data-label="状态码">
+          <span class="status-code" :class="`status-code--${getStatusTone(log.statusCode)}`">
             {{ log.statusCode || '—' }}
           </span>
+        </span>
+
+        <span class="log-row__cell log-row__cell--latency" data-label="延迟">
           <span class="latency-pill">{{ formatLatency(log.latencyMs) }}</span>
-        </div>
-      </div>
-    </li>
-  </ul>
+        </span>
+      </li>
+    </ul>
+  </div>
 </template>
 
 <style scoped>
-.log-list {
+.log-shell {
   display: grid;
-  gap: 14px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  gap: 10px;
 }
 
-.log-item {
+.log-legend,
+.log-row {
   display: grid;
-  gap: 14px;
-  padding: 18px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(2, 6, 23, 0.72));
-}
-
-.log-item__top,
-.log-item__main {
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
+  grid-template-columns: 132px 92px minmax(180px, 1.4fr) minmax(140px, 1fr) 84px 84px;
+  gap: 12px;
   align-items: center;
 }
 
-.log-item__top time {
-  color: rgba(203, 213, 225, 0.88);
-  font-size: 0.94rem;
+.log-legend {
+  padding: 0 14px;
+}
+
+.log-legend span {
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.log-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.log-row {
+  padding: 12px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: rgba(29, 27, 24, 0.92);
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.log-row:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-hover);
+  background: var(--bg-hover);
+}
+
+.log-row__cell {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 0.84rem;
+}
+
+.log-row__cell time,
+.log-row__cell--provider {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
 }
 
-.log-item__target,
-.log-item__model {
-  display: grid;
-  gap: 6px;
-}
-
-.log-item__target strong,
-.log-item__model code {
-  color: #f8fafc;
-  font-size: 1rem;
-}
-
-.log-item__model code {
+.log-row__cell--model code {
+  width: 100%;
+  justify-content: flex-start;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.log-item__label {
-  color: rgba(148, 163, 184, 0.88);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.log-item__metrics {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.status-pill,
+.status-code,
 .latency-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 34px;
-  padding: 0 12px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
   border-radius: 999px;
-  font-weight: 800;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
-.status-pill--ok {
-  color: #bbf7d0;
-  background: rgba(20, 83, 45, 0.42);
+.status-code--success {
+  color: var(--status-success-text);
+  border-color: var(--status-success-border);
+  background: var(--status-success-bg);
 }
 
-.status-pill--warn {
-  color: #fde68a;
-  background: rgba(120, 53, 15, 0.42);
+.status-code--warning {
+  color: var(--status-warning-text);
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-bg);
 }
 
-.status-pill--error {
-  color: #fecaca;
-  background: rgba(127, 29, 29, 0.4);
+.status-code--danger {
+  color: var(--status-danger-text);
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-bg);
 }
 
-.status-pill--idle {
-  color: #cbd5e1;
-  background: rgba(51, 65, 85, 0.62);
+.status-code--neutral {
+  color: var(--status-neutral-text);
+  border-color: var(--status-neutral-border);
+  background: var(--status-neutral-bg);
 }
 
 .latency-pill {
-  color: #dbeafe;
-  background: rgba(30, 64, 175, 0.34);
+  color: var(--primary-active);
+  border-color: rgba(139, 134, 128, 0.24);
+  background: rgba(139, 134, 128, 0.14);
 }
 
 .empty-state {
   display: grid;
   place-items: center;
   min-height: 240px;
-  border: 1px dashed rgba(148, 163, 184, 0.18);
-  border-radius: 18px;
-  color: rgba(148, 163, 184, 0.9);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
   text-align: center;
+  background: rgba(29, 27, 24, 0.52);
 }
 
-@media (max-width: 960px) {
-  .log-item__main {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: flex-start;
+@media (max-width: 1080px) {
+  .log-legend {
+    display: none;
   }
 
-  .log-item__metrics {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
+  .log-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 14px;
+  }
+
+  .log-row__cell {
+    display: grid;
+    gap: 6px;
+    align-content: start;
+  }
+
+  .log-row__cell::before {
+    content: attr(data-label);
+    color: var(--text-tertiary);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
   }
 }
 
 @media (max-width: 640px) {
-  .log-item__top,
-  .log-item__main {
-    display: grid;
+  .log-row {
     grid-template-columns: 1fr;
   }
 
-  .log-item__model code {
+  .log-row__cell--model code {
     white-space: normal;
     word-break: break-word;
   }
