@@ -20,26 +20,55 @@ High-performance AI API protocol router. Accepts any of the three protocols, rou
 | **Claude** | ✅ | passthrough | ✅ |
 | **Gemini** | ✅ | ✅ | passthrough |
 
-## Usage
+## Quick Start
+
+### 1. Configure
 
 ```bash
 cd api
-cp config.example.yaml config.yaml   # fill in your API keys
-go run ./cmd/server                   # :8446
+cp config.example.yaml config.yaml
+# Edit config.yaml — fill in your API keys
 ```
 
+### 2. Start Backend
+
 ```bash
-# OpenAI protocol → Claude backend
+cd api
+go run ./cmd/server
+# ✅ server listening on :8446
+```
+
+### 3. Start Dashboard (optional)
+
+```bash
+cd web
+npm install
+npm run dev
+# ✅ http://localhost:5173
+```
+
+### 4. Send Requests
+
+```bash
+# OpenAI protocol → Claude backend (auto-translate)
 curl localhost:8446/v1/chat/completions \
   -d '{"model":"claude-sonnet-4-6","messages":[{"role":"user","content":"Hello"}]}'
 
-# Claude protocol → Gemini backend
+# Claude protocol → Claude backend (passthrough)
 curl localhost:8446/v1/messages \
-  -d '{"model":"gemini-3-pro-preview","max_tokens":1024,"messages":[{"role":"user","content":"Hello"}]}'
+  -d '{"model":"claude-sonnet-4-6","max_tokens":1024,"messages":[{"role":"user","content":"Hello"}]}'
+```
 
-# Gemini protocol → OpenAI backend
-curl localhost:8446/v1beta/models/gpt-5.4:generateContent \
-  -d '{"contents":[{"role":"user","parts":[{"text":"Hello"}]}]}'
+### 5. Integration Test
+
+```bash
+go run tests/e2e/main.go
+```
+
+### 6. Docker
+
+```bash
+docker compose up -d
 ```
 
 ## Endpoints
@@ -49,15 +78,16 @@ curl localhost:8446/v1beta/models/gpt-5.4:generateContent \
 | OpenAI | `/v1/chat/completions` |
 | Claude | `/v1/messages` |
 | Gemini | `/v1beta/models/{model}:generateContent` |
-| Gemini Stream | `/v1beta/models/{model}:streamGenerateContent` |
+
+**Management API**: `/healthz` · `/api/providers` · `/api/routes` · `/api/logs`
 
 ## Roadmap
 
-- [ ] SSE cross-protocol streaming translation
-- [ ] Connection pool & concurrency optimization
-- [ ] Vue TS dashboard
-- [ ] Docker / K8s / CI-CD
-- [ ] Metrics & logging
+- [x] 3×3 protocol matrix translation
+- [x] SSE cross-protocol streaming
+- [x] Thinking / Reasoning bidirectional
+- [x] Connection pool & concurrency
+- [x] Vue TS dashboard
+- [x] Docker & CI/CD
 - [ ] Load balancing & weighted routing
 - [ ] Multi-tenancy & rate limiting
-

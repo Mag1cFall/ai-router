@@ -49,7 +49,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config) {
 			"logs":     logs.Snapshot(),
 		})
 	})
-	r.Any("/*path", detectMiddleware(), resolveMiddleware(cfg), proxyMiddleware(), respondMiddleware())
+	r.NoRoute(detectMiddleware(), resolveMiddleware(cfg), proxyMiddleware(), respondMiddleware())
 }
 
 func detectMiddleware() gin.HandlerFunc {

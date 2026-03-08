@@ -19,21 +19,21 @@ const (
 )
 
 type Provider struct {
-	Name     string           `yaml:"name"`
-	Protocol ProviderProtocol `yaml:"protocol"`
-	Endpoint string           `yaml:"endpoint"`
-	APIKey   string           `yaml:"api_key"`
+	Name     string           `yaml:"name" json:"name"`
+	Protocol ProviderProtocol `yaml:"protocol" json:"protocol"`
+	Endpoint string           `yaml:"endpoint" json:"endpoint"`
+	APIKey   string           `yaml:"api_key" json:"-"`
 }
 
 type Route struct {
-	MatchModel string `yaml:"match_model"`
-	Provider   string `yaml:"provider"`
+	MatchModel string `yaml:"match_model" json:"match_model"`
+	Provider   string `yaml:"provider" json:"provider"`
 }
 
 type Server struct {
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
-	LogLevel string `yaml:"log_level"`
+	Host     string `yaml:"host" json:"host"`
+	Port     int    `yaml:"port" json:"port"`
+	LogLevel string `yaml:"log_level" json:"log_level"`
 }
 
 type Config struct {

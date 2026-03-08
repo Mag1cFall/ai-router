@@ -87,6 +87,11 @@ func requestLoggingMiddleware(store *requestLogStore) gin.HandlerFunc {
 		startedAt := time.Now()
 		c.Next()
 
+		path := c.Request.URL.Path
+		if strings.HasPrefix(path, "/api/") || path == "/healthz" || path == "/favicon.ico" {
+			return
+		}
+
 		protocol := protocolForLog(c)
 		model := stringValue(c, ctxModelKey)
 		provider := providerForLog(c)
@@ -94,7 +99,7 @@ func requestLoggingMiddleware(store *requestLogStore) gin.HandlerFunc {
 		store.Add(requestLogEntry{
 			Timestamp:  startedAt.UTC(),
 			Method:     c.Request.Method,
-			Path:       c.Request.URL.Path,
+			Path:       path,
 			Protocol:   protocol,
 			Model:      model,
 			Provider:   provider,
