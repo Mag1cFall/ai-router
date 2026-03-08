@@ -1,0 +1,20 @@
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "8446:8446"
+    volumes:
+      - ./api/config.yaml:/app/config.yaml:ro
+
+  web:
+    profiles:
+      - web
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api

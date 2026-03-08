@@ -1,0 +1,14 @@
+.git
+.gitignore
+.github
+**/.DS_Store
+**/.idea
+**/.vscode
+**/node_modules
+**/dist
+**/build
+**/.cache
+**/coverage
+**/*.log
+**/tmp
+**/temp

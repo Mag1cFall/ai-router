@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"context"
+	"errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/Mag1cFall/ai-router/api/internal/config"
 	"github.com/Mag1cFall/ai-router/api/internal/proto/detect"
@@ -20,8 +23,31 @@ const (
 )
 
 func RegisterRoutes(r *gin.Engine, cfg *config.Config) {
+	logs := newRequestLogStore(requestLogCapacity)
+	r.Use(requestLoggingMiddleware(logs), recoveryMiddleware(), corsMiddleware())
+
 	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+	r.GET("/api/providers", func(c *gin.Context) {
+		providers := make([]gin.H, 0, len(cfg.Providers))
+		for _, provider := range cfg.Providers {
+			providers = append(providers, gin.H{
+				"name":     provider.Name,
+				"protocol": provider.Protocol,
+				"endpoint": provider.Endpoint,
+			})
+		}
+		c.JSON(http.StatusOK, gin.H{"providers": providers})
+	})
+	r.GET("/api/routes", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"routes": cfg.Routes})
+	})
+	r.GET("/api/logs", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"capacity": logs.Capacity(),
+			"logs":     logs.Snapshot(),
+		})
 	})
 	r.Any("/*path", detectMiddleware(), resolveMiddleware(cfg), proxyMiddleware(), respondMiddleware())
 }
@@ -80,7 +106,17 @@ func proxyMiddleware() gin.HandlerFunc {
 			Stream:           stream.(bool),
 		})
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+			status := http.StatusBadGateway
+			var proxyErr *proxy.Error
+			if errors.As(err, &proxyErr) {
+				switch {
+				case errors.Is(proxyErr.Err, context.DeadlineExceeded), errors.Is(proxyErr.Err, context.Canceled):
+					status = http.StatusGatewayTimeout
+				case proxyErr.UpstreamStatusCode >= http.StatusBadRequest:
+					status = proxyErr.UpstreamStatusCode
+				}
+			}
+			c.AbortWithStatusJSON(status, gin.H{"error": err.Error()})
 			return
 		}
 		c.Set(ctxResponseKey, resp)
@@ -104,6 +140,23 @@ func respondMiddleware() gin.HandlerFunc {
 			}
 		}
 		c.Status(resp.StatusCode)
-		_, _ = io.Copy(c.Writer, resp.Body)
+
+		writer := io.Writer(c.Writer)
+		if strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/event-stream") {
+			writer = flushWriter{ResponseWriter: c.Writer}
+		}
+		_, _ = io.Copy(writer, resp.Body)
 	}
+}
+
+type flushWriter struct {
+	gin.ResponseWriter
+}
+
+func (w flushWriter) Write(data []byte) (int, error) {
+	written, err := w.ResponseWriter.Write(data)
+	if err == nil && written > 0 {
+		w.ResponseWriter.Flush()
+	}
+	return written, err
 }

@@ -33,13 +33,18 @@ func RequestToOpenAI(modelName string, input []byte) []byte {
 		role := content.Get("role").String()
 		textParts := make([]any, 0)
 		texts := make([]string, 0)
+		reasoning := make([]string, 0)
 		toolCalls := make([]any, 0)
 		toolMessages := make([]any, 0)
 
 		for _, part := range content.Get("parts").Array() {
 			if text := part.Get("text"); text.Exists() {
-				texts = append(texts, text.String())
-				textParts = append(textParts, map[string]any{"type": "text", "text": text.String()})
+				if role == "model" && part.Get("thought").Bool() {
+					reasoning = append(reasoning, text.String())
+				} else {
+					texts = append(texts, text.String())
+					textParts = append(textParts, map[string]any{"type": "text", "text": text.String()})
+				}
 				continue
 			}
 			if inlineData := part.Get("inlineData"); inlineData.Exists() || part.Get("inline_data").Exists() {
@@ -112,6 +117,9 @@ func RequestToOpenAI(modelName string, input []byte) []byte {
 			if len(toolCalls) > 0 {
 				msg["tool_calls"] = toolCalls
 			}
+			if len(reasoning) > 0 {
+				msg["reasoning_content"] = strings.Join(reasoning, "")
+			}
 			messages = append(messages, msg)
 		}
 	}
@@ -142,7 +150,11 @@ func RequestToClaude(modelName string, input []byte) []byte {
 		blocks := make([]any, 0)
 		for _, part := range content.Get("parts").Array() {
 			if text := part.Get("text"); text.Exists() {
-				blocks = append(blocks, map[string]any{"type": "text", "text": text.String()})
+				if role == "model" && part.Get("thought").Bool() {
+					blocks = append(blocks, map[string]any{"type": "thinking", "thinking": text.String()})
+				} else {
+					blocks = append(blocks, map[string]any{"type": "text", "text": text.String()})
+				}
 				continue
 			}
 			if call := part.Get("functionCall"); call.Exists() {
@@ -252,8 +264,12 @@ func ResponseToClaude(input []byte) []byte {
 	candidate := root.Get("candidates.0")
 	content := make([]any, 0)
 	for _, part := range candidate.Get("content.parts").Array() {
-		if text := part.Get("text"); text.Exists() && !part.Get("thought").Bool() {
-			content = append(content, map[string]any{"type": "text", "text": text.String()})
+		if text := part.Get("text"); text.Exists() {
+			if part.Get("thought").Bool() {
+				content = append(content, map[string]any{"type": "thinking", "thinking": text.String()})
+			} else {
+				content = append(content, map[string]any{"type": "text", "text": text.String()})
+			}
 			continue
 		}
 		if call := part.Get("functionCall"); call.Exists() {

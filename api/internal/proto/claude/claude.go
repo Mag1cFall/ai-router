@@ -197,11 +197,16 @@ func RequestToGemini(modelName string, input []byte) []byte {
 func ResponseToOpenAI(input []byte) []byte {
 	root := gjson.ParseBytes(input)
 	texts := make([]string, 0)
+	reasoning := make([]string, 0)
 	toolCalls := make([]any, 0)
 	for _, part := range root.Get("content").Array() {
 		switch part.Get("type").String() {
 		case "text":
 			texts = append(texts, part.Get("text").String())
+		case "thinking":
+			if thinking := strings.TrimSpace(part.Get("thinking").String()); thinking != "" {
+				reasoning = append(reasoning, thinking)
+			}
 		case "tool_use":
 			toolCalls = append(toolCalls, map[string]any{
 				"id":   part.Get("id").String(),
@@ -217,6 +222,9 @@ func ResponseToOpenAI(input []byte) []byte {
 	message := map[string]any{
 		"role":    "assistant",
 		"content": strings.Join(texts, ""),
+	}
+	if len(reasoning) > 0 {
+		message["reasoning_content"] = strings.Join(reasoning, "")
 	}
 	if len(toolCalls) > 0 {
 		message["tool_calls"] = toolCalls

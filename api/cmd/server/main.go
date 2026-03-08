@@ -1,9 +1,16 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/Mag1cFall/ai-router/api/internal/config"
 	"github.com/Mag1cFall/ai-router/api/internal/handler"
@@ -11,9 +18,14 @@ import (
 )
 
 func main() {
-	cfg, err := config.Load("config.yaml")
+	configPath := strings.TrimSpace(os.Getenv("AI_ROUTER_CONFIG"))
+	if configPath == "" {
+		configPath = "config.yaml"
+	}
+
+	cfg, err := config.Load(configPath)
 	if err != nil {
-		log.Fatalf("load config.yaml: %v", err)
+		log.Fatalf("load %s: %v", configPath, err)
 	}
 
 	if strings.EqualFold(cfg.Server.LogLevel, "debug") {
@@ -23,14 +35,58 @@ func main() {
 	}
 
 	r := gin.New()
-	r.Use(gin.Recovery())
 	handler.RegisterRoutes(r, cfg)
 
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	if cfg.Server.Host == "" {
 		addr = fmt.Sprintf(":%d", cfg.Server.Port)
 	}
-	if err := r.Run(addr); err != nil {
+
+	providerNames := make([]string, 0, len(cfg.Providers))
+	for _, provider := range cfg.Providers {
+		providerNames = append(providerNames, fmt.Sprintf("%s(%s)", provider.Name, provider.Protocol))
+	}
+	if len(providerNames) == 0 {
+		providerNames = append(providerNames, "none")
+	}
+
+	server := &http.Server{
+		Addr:    addr,
+		Handler: r,
+	}
+
+	shutdownSignal, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	serverErr := make(chan error, 1)
+	go func() {
+		log.Printf("server listening on %s providers=%s", addr, strings.Join(providerNames, ", "))
+		err := server.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- err
+			return
+		}
+		serverErr <- nil
+	}()
+
+	select {
+	case err := <-serverErr:
+		if err != nil {
+			log.Fatalf("run server: %v", err)
+		}
+		return
+	case <-shutdownSignal.Done():
+	}
+
+	log.Printf("shutdown signal received, stopping server")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("shutdown server: %v", err)
+	}
+	if err := <-serverErr; err != nil {
 		log.Fatalf("run server: %v", err)
 	}
+	log.Printf("server stopped")
 }

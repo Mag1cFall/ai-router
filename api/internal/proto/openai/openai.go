@@ -31,7 +31,8 @@ func RequestToGemini(_ string, input []byte) []byte {
 		case "system":
 			systemParts = append(systemParts, openAIContentToGeminiParts(message.Get("content"), true)...)
 		case "user", "assistant":
-			parts := openAIContentToGeminiParts(message.Get("content"), false)
+			parts := openAIReasoningToGeminiParts(message.Get("reasoning_content"))
+			parts = append(parts, openAIContentToGeminiParts(message.Get("content"), false)...)
 			if role == "assistant" {
 				for _, tc := range message.Get("tool_calls").Array() {
 					parts = append(parts, map[string]any{
@@ -135,7 +136,8 @@ func RequestToClaude(modelName string, input []byte) []byte {
 				}},
 			})
 		case "user", "assistant":
-			blocks := openAIContentToClaudeBlocks(message.Get("content"))
+			blocks := openAIReasoningToClaudeBlocks(message.Get("reasoning_content"))
+			blocks = append(blocks, openAIContentToClaudeBlocks(message.Get("content"))...)
 			if role == "assistant" {
 				for _, tc := range message.Get("tool_calls").Array() {
 					blocks = append(blocks, map[string]any{
@@ -179,6 +181,9 @@ func ResponseToClaude(input []byte) []byte {
 	choice := root.Get("choices.0")
 	content := make([]any, 0)
 
+	for _, block := range openAIReasoningToClaudeBlocks(choice.Get("message.reasoning_content")) {
+		content = append(content, block)
+	}
 	for _, block := range openAIContentToClaudeBlocks(choice.Get("message.content")) {
 		content = append(content, block)
 	}
@@ -218,6 +223,9 @@ func ResponseToGemini(input []byte) []byte {
 	candidates := make([]any, 0)
 	for _, choice := range root.Get("choices").Array() {
 		parts := make([]any, 0)
+		for _, part := range openAIReasoningToGeminiParts(choice.Get("message.reasoning_content")) {
+			parts = append(parts, part)
+		}
 		for _, part := range openAIContentToGeminiParts(choice.Get("message.content"), false) {
 			parts = append(parts, part)
 		}
@@ -344,6 +352,46 @@ func openAIContentToClaudeBlocks(content gjson.Result) []any {
 		}
 	}
 	return blocks
+}
+
+func openAIReasoningToGeminiParts(reasoning gjson.Result) []any {
+	parts := make([]any, 0)
+	for _, text := range openAIReasoningTexts(reasoning) {
+		parts = append(parts, map[string]any{"thought": true, "text": text})
+	}
+	return parts
+}
+
+func openAIReasoningToClaudeBlocks(reasoning gjson.Result) []any {
+	blocks := make([]any, 0)
+	for _, text := range openAIReasoningTexts(reasoning) {
+		blocks = append(blocks, map[string]any{"type": "thinking", "thinking": text})
+	}
+	return blocks
+}
+
+func openAIReasoningTexts(reasoning gjson.Result) []string {
+	texts := make([]string, 0)
+	if !reasoning.Exists() {
+		return texts
+	}
+	if reasoning.IsArray() {
+		for _, item := range reasoning.Array() {
+			texts = append(texts, openAIReasoningTexts(item)...)
+		}
+		return texts
+	}
+	switch reasoning.Type {
+	case gjson.String:
+		if text := strings.TrimSpace(reasoning.String()); text != "" {
+			texts = append(texts, text)
+		}
+	case gjson.JSON:
+		if text := strings.TrimSpace(reasoning.Get("text").String()); text != "" {
+			texts = append(texts, text)
+		}
+	}
+	return texts
 }
 
 func openAIToolsToGemini(tools gjson.Result) []any {
