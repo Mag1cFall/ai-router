@@ -1,0 +1,28 @@
+providers:
+  - name: openai
+    protocol: openai
+    endpoint: https://api.openai.com/v1
+    api_key: sk-openai-example
+
+  - name: claude
+    protocol: claude
+    endpoint: https://api.anthropic.com
+    api_key: sk-ant-example
+
+  - name: gemini
+    protocol: gemini
+    endpoint: https://generativelanguage.googleapis.com/v1beta
+    api_key: AIza-example
+
+routes:
+  - match_model: "gpt-*"
+    provider: openai
+  - match_model: "claude-*"
+    provider: claude
+  - match_model: "gemini-*"
+    provider: gemini
+
+server:
+  host: ""
+  port: 8446
+  log_level: info

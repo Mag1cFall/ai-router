@@ -1,0 +1,48 @@
+# Config (keep example, ignore real)
+config.yaml
+.env
+.env.*
+!.env.example
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.prof
+vendor/
+coverage.out
+coverage.html
+
+# Frontend
+node_modules/
+dist/
+web/dist/
+web/node_modules/
+.nuxt/
+*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# OS
+*.log
+tmp/
+*.tmp
+*.bak
+
+# Build artifacts
+bin/
+build/
