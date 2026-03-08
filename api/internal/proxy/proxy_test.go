@@ -36,7 +36,7 @@ func mockProvider(t *testing.T, protocol config.ProviderProtocol, responseBody s
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(statusCode)
-		w.Write([]byte(responseBody))
+		_, _ = w.Write([]byte(responseBody))
 	}))
 	t.Cleanup(srv.Close)
 	return srv, config.Provider{
@@ -183,7 +183,7 @@ func TestProxy_StreamingOpenAI(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(200)
-		w.Write([]byte(chunks))
+		_, _ = w.Write([]byte(chunks))
 	}))
 	defer srv.Close()
 

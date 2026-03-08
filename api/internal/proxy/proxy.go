@@ -210,7 +210,7 @@ func translateStreamResponse(ctx context.Context, req Request, resp *http.Respon
 	translated.Body = reader
 
 	go func() {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		translator := streamTranslators[streamTranslationKey{from: req.Provider.Protocol, to: req.IncomingProtocol}]
 		if err := relaySSE(ctx, resp.Body, writer, translator); err != nil {
 			_ = writer.CloseWithError(wrapError("stream response", req.Provider, resp.StatusCode, err))

@@ -132,7 +132,7 @@ func respondMiddleware() gin.HandlerFunc {
 			return
 		}
 		resp := value.(*http.Response)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		for key, values := range resp.Header {
 			for _, value := range values {
@@ -156,7 +156,7 @@ type flushWriter struct {
 func (w flushWriter) Write(data []byte) (int, error) {
 	written, err := w.ResponseWriter.Write(data)
 	if err == nil && written > 0 {
-		w.ResponseWriter.Flush()
+		w.Flush()
 	}
 	return written, err
 }

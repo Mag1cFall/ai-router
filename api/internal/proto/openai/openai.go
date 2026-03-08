@@ -181,12 +181,8 @@ func ResponseToClaude(input []byte) []byte {
 	choice := root.Get("choices.0")
 	content := make([]any, 0)
 
-	for _, block := range openAIReasoningToClaudeBlocks(choice.Get("message.reasoning_content")) {
-		content = append(content, block)
-	}
-	for _, block := range openAIContentToClaudeBlocks(choice.Get("message.content")) {
-		content = append(content, block)
-	}
+	content = append(content, openAIReasoningToClaudeBlocks(choice.Get("message.reasoning_content"))...)
+	content = append(content, openAIContentToClaudeBlocks(choice.Get("message.content"))...)
 	if toolCalls := choice.Get("message.tool_calls"); toolCalls.IsArray() {
 		for _, tc := range toolCalls.Array() {
 			content = append(content, map[string]any{
@@ -223,12 +219,8 @@ func ResponseToGemini(input []byte) []byte {
 	candidates := make([]any, 0)
 	for _, choice := range root.Get("choices").Array() {
 		parts := make([]any, 0)
-		for _, part := range openAIReasoningToGeminiParts(choice.Get("message.reasoning_content")) {
-			parts = append(parts, part)
-		}
-		for _, part := range openAIContentToGeminiParts(choice.Get("message.content"), false) {
-			parts = append(parts, part)
-		}
+		parts = append(parts, openAIReasoningToGeminiParts(choice.Get("message.reasoning_content"))...)
+		parts = append(parts, openAIContentToGeminiParts(choice.Get("message.content"), false)...)
 		if toolCalls := choice.Get("message.tool_calls"); toolCalls.IsArray() {
 			for _, tc := range toolCalls.Array() {
 				parts = append(parts, map[string]any{

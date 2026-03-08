@@ -179,7 +179,7 @@ func claudeOpenAIChunk(state *claudeOpenAIStreamState, delta map[string]any, fin
 	if finish != nil {
 		payload["choices"].([]any)[0].(map[string]any)["finish_reason"] = finish["finish_reason"]
 	}
-	if usage != nil && len(usage) > 0 {
+	if len(usage) > 0 {
 		payload["usage"] = usage
 	}
 	return append([]byte("data: "), append(mustJSON(payload), []byte("\n\n")...)...)
