@@ -1,3 +1,4 @@
+// Claude 流式响应转换：将 Claude SSE 事件转换为 OpenAI 流式 chunk 格式
 package claude
 
 import (
@@ -8,6 +9,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+// claudeOpenAIStreamState 跟踪单个 Claude->OpenAI 流的转换状态
 type claudeOpenAIStreamState struct {
 	ID               string
 	Model            string
@@ -15,6 +17,7 @@ type claudeOpenAIStreamState struct {
 	ToolCallsByIndex map[int]*claudeOpenAIToolState
 }
 
+// claudeOpenAIToolState 跟踪单个 tool_use block 的参数积累
 type claudeOpenAIToolState struct {
 	ID   string
 	Name string
@@ -26,6 +29,7 @@ var (
 	claudeOpenAIState    *claudeOpenAIStreamState
 )
 
+// StreamResponseToOpenAI 将 Claude SSE 事件转换为 OpenAI chat.completion.chunk
 func StreamResponseToOpenAI(event []byte) []byte {
 	claudeOpenAIStreamMu.Lock()
 	defer claudeOpenAIStreamMu.Unlock()
@@ -134,6 +138,7 @@ func StreamResponseToOpenAI(event []byte) []byte {
 	return nil
 }
 
+// parseClaudeStreamEvent 解析 Claude SSE 行序，返回事件名和 data 内容
 func parseClaudeStreamEvent(event []byte) (string, []byte) {
 	raw := strings.TrimSpace(string(event))
 	if raw == "" {
@@ -161,6 +166,7 @@ func parseClaudeStreamEvent(event []byte) (string, []byte) {
 	return eventName, []byte(strings.Join(dataLines, "\n"))
 }
 
+// claudeOpenAIChunk 构建一个 OpenAI SSE chunk 并写入 "data: " 前缀
 func claudeOpenAIChunk(state *claudeOpenAIStreamState, delta map[string]any, finish map[string]any, usage map[string]any) []byte {
 	if state == nil {
 		state = &claudeOpenAIStreamState{Created: time.Now().Unix()}

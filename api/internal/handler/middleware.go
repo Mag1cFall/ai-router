@@ -1,3 +1,4 @@
+// 通用中间件：请求日志（环形缓冲区）、panic 恢复、CORS
 package handler
 
 import (
@@ -14,6 +15,7 @@ import (
 
 const requestLogCapacity = 256
 
+// requestLogEntry 单条请求日志记录
 type requestLogEntry struct {
 	Timestamp  time.Time `json:"timestamp"`
 	Method     string    `json:"method"`
@@ -25,6 +27,7 @@ type requestLogEntry struct {
 	LatencyMS  int64     `json:"latency_ms"`
 }
 
+// requestLogStore 固定容量环形缓冲区，存储最新的请求日志
 type requestLogStore struct {
 	mu      sync.Mutex
 	entries []requestLogEntry
@@ -32,6 +35,7 @@ type requestLogStore struct {
 	filled  bool
 }
 
+// newRequestLogStore 创建日志存储，capacity <= 0 时使用默认值
 func newRequestLogStore(capacity int) *requestLogStore {
 	if capacity <= 0 {
 		capacity = requestLogCapacity
@@ -39,6 +43,7 @@ func newRequestLogStore(capacity int) *requestLogStore {
 	return &requestLogStore{entries: make([]requestLogEntry, capacity)}
 }
 
+// Add 写入日志条目，满时覆盖最老记录
 func (s *requestLogStore) Add(entry requestLogEntry) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -50,6 +55,7 @@ func (s *requestLogStore) Add(entry requestLogEntry) {
 	}
 }
 
+// Snapshot 返回所有日志，按时间倒序（最新在前）
 func (s *requestLogStore) Snapshot() []requestLogEntry {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -78,10 +84,12 @@ func (s *requestLogStore) Snapshot() []requestLogEntry {
 	return result
 }
 
+// Capacity 返回缓冲区容量
 func (s *requestLogStore) Capacity() int {
 	return len(s.entries)
 }
 
+// requestLoggingMiddleware 记录代理请求的耗时、协议、模型和 Provider，跳过内部 API 路径
 func requestLoggingMiddleware(store *requestLogStore) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		startedAt := time.Now()
@@ -109,6 +117,7 @@ func requestLoggingMiddleware(store *requestLogStore) gin.HandlerFunc {
 	}
 }
 
+// recoveryMiddleware 捕获 panic 并返回 500，打印堆栈
 func recoveryMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
@@ -121,6 +130,7 @@ func recoveryMiddleware() gin.HandlerFunc {
 	}
 }
 
+// corsMiddleware 设置 CORS 头，允许所有来源，OPTIONS 预检直接返回 204
 func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		headers := c.Writer.Header()
@@ -138,6 +148,7 @@ func corsMiddleware() gin.HandlerFunc {
 	}
 }
 
+// protocolForLog 从 context 提取协议名用于日志
 func protocolForLog(c *gin.Context) string {
 	if protocolValue, ok := c.Get(ctxProtocolKey); ok {
 		if protocol, ok := protocolValue.(config.ProviderProtocol); ok {
@@ -150,6 +161,7 @@ func protocolForLog(c *gin.Context) string {
 	return "unknown"
 }
 
+// providerForLog 从 context 提取 Provider 名用于日志
 func providerForLog(c *gin.Context) string {
 	if providerValue, ok := c.Get(ctxProviderKey); ok {
 		if provider, ok := providerValue.(config.Provider); ok {
@@ -159,6 +171,7 @@ func providerForLog(c *gin.Context) string {
 	return ""
 }
 
+// stringValue 安全读取 gin context 中的字符串值
 func stringValue(c *gin.Context, key string) string {
 	value, ok := c.Get(key)
 	if !ok {

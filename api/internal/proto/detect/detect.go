@@ -1,3 +1,4 @@
+// 入站请求协议识别：根据 HTTP 方法、路径和请求体判断 OpenAI/Claude/Gemini
 package detect
 
 import (
@@ -17,6 +18,7 @@ const (
 	ProtocolGemini  = config.ProtocolGemini
 )
 
+// FromRequest 根据请求方法、路径和请求体内容判断入站协议
 func FromRequest(method, path string, body []byte) Protocol {
 	path = normalizePath(path)
 
@@ -37,6 +39,7 @@ func FromRequest(method, path string, body []byte) Protocol {
 	}
 }
 
+// ExtractModelName 从请求路径（Gemini）或请求体 model 字段提取模型名
 func ExtractModelName(path string, body []byte) string {
 	path = normalizePath(path)
 	if isGeminiPath(path) {
@@ -60,6 +63,7 @@ func ExtractModelName(path string, body []byte) string {
 	return gjson.GetBytes(body, "model").String()
 }
 
+// IsStreaming 判断请求体是否开启流式输出
 func IsStreaming(body []byte) bool {
 	if len(body) == 0 || !json.Valid(body) {
 		return false
@@ -67,6 +71,7 @@ func IsStreaming(body []byte) bool {
 	return gjson.GetBytes(body, "stream").Bool()
 }
 
+// normalizePath 删除查询参数并去除末尾断斜杠
 func normalizePath(path string) string {
 	if idx := strings.Index(path, "?"); idx >= 0 {
 		path = path[:idx]
@@ -83,6 +88,7 @@ func normalizePath(path string) string {
 	return path
 }
 
+// isGeminiPath 判断路径是否为 Gemini generateContent 或 streamGenerateContent
 func isGeminiPath(path string) bool {
 	if !strings.HasPrefix(path, "/v1beta/models/") && !strings.HasPrefix(path, "/v1/models/") {
 		return false

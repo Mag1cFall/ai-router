@@ -1,3 +1,4 @@
+// Gemini 协议转换：将 Gemini 请求/响应互转 OpenAI 和 Claude 格式
 package gemini
 
 import (
@@ -8,6 +9,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+// RequestToOpenAI 将 Gemini generateContent 请求转换为 OpenAI Chat Completions 格式
 func RequestToOpenAI(modelName string, input []byte) []byte {
 	root := gjson.ParseBytes(input)
 	out := map[string]any{
@@ -128,6 +130,7 @@ func RequestToOpenAI(modelName string, input []byte) []byte {
 	return mustJSON(out)
 }
 
+// RequestToClaude 将 Gemini generateContent 请求转换为 Claude Messages 格式
 func RequestToClaude(modelName string, input []byte) []byte {
 	root := gjson.ParseBytes(input)
 	out := map[string]any{
@@ -196,6 +199,7 @@ func RequestToClaude(modelName string, input []byte) []byte {
 	return mustJSON(out)
 }
 
+// ResponseToOpenAI 将 Gemini generateContent 响应转换为 OpenAI Chat Completions 响应
 func ResponseToOpenAI(input []byte) []byte {
 	root := gjson.ParseBytes(input)
 	choices := make([]any, 0)
@@ -259,6 +263,7 @@ func ResponseToOpenAI(input []byte) []byte {
 	return mustJSON(out)
 }
 
+// ResponseToClaude 将 Gemini generateContent 响应转换为 Claude Messages 响应
 func ResponseToClaude(input []byte) []byte {
 	root := gjson.ParseBytes(input)
 	candidate := root.Get("candidates.0")
@@ -298,6 +303,7 @@ func ResponseToClaude(input []byte) []byte {
 	return mustJSON(out)
 }
 
+// geminiSystemToOpenAI 将 Gemini system_instruction 转换为 OpenAI system 消息
 func geminiSystemToOpenAI(system gjson.Result) any {
 	parts := geminiSystemTextParts(system)
 	if len(parts) == 0 {
@@ -311,6 +317,7 @@ func geminiSystemToOpenAI(system gjson.Result) any {
 	return map[string]any{"role": "system", "content": parts}
 }
 
+// geminiSystemToClaude 将 Gemini system_instruction 转换为 Claude system 字段
 func geminiSystemToClaude(system gjson.Result) any {
 	parts := geminiSystemTextParts(system)
 	if len(parts) == 0 {
@@ -330,6 +337,7 @@ func geminiSystemToClaude(system gjson.Result) any {
 	return blocks
 }
 
+// geminiSystemTextParts 提取 Gemini system_instruction 中所有文本 parts
 func geminiSystemTextParts(system gjson.Result) []any {
 	parts := make([]any, 0)
 	for _, part := range system.Get("parts").Array() {
@@ -340,6 +348,7 @@ func geminiSystemTextParts(system gjson.Result) []any {
 	return parts
 }
 
+// geminiFunctionResponseContent 提取工具返回内容，优先取 result 字段
 func geminiFunctionResponseContent(response gjson.Result) any {
 	if !response.Exists() {
 		return ""
@@ -350,6 +359,7 @@ func geminiFunctionResponseContent(response gjson.Result) any {
 	return response.Value()
 }
 
+// nextCallID 按函数名 FIFO 消费调用 ID，用于 Gemini functionResponse 匹配
 func nextCallID(queues map[string][]string, name string) string {
 	list := queues[name]
 	if len(list) == 0 {
@@ -360,6 +370,7 @@ func nextCallID(queues map[string][]string, name string) string {
 	return id
 }
 
+// rawJSONString 将 gjson.Result 转为原始 JSON，空时返回 {}
 func rawJSONString(value gjson.Result) string {
 	if !value.Exists() || strings.TrimSpace(value.Raw) == "" {
 		return "{}"
@@ -367,6 +378,7 @@ func rawJSONString(value gjson.Result) string {
 	return value.Raw
 }
 
+// mapGeminiFinishReasonToOpenAI 将 Gemini finishReason 映射到 OpenAI finish_reason
 func mapGeminiFinishReasonToOpenAI(reason string) string {
 	switch strings.ToUpper(reason) {
 	case "MAX_TOKENS":
@@ -380,6 +392,7 @@ func mapGeminiFinishReasonToOpenAI(reason string) string {
 	}
 }
 
+// mapGeminiFinishReasonToClaude 将 Gemini finishReason 映射到 Claude stop_reason
 func mapGeminiFinishReasonToClaude(reason string) string {
 	switch strings.ToUpper(reason) {
 	case "MAX_TOKENS":
@@ -391,6 +404,7 @@ func mapGeminiFinishReasonToClaude(reason string) string {
 	}
 }
 
+// onlyTextParts 判断 parts 列表是否全部为文本类型
 func onlyTextParts(parts []any) bool {
 	for _, part := range parts {
 		item, ok := part.(map[string]any)
@@ -404,6 +418,7 @@ func onlyTextParts(parts []any) bool {
 	return true
 }
 
+// defaultString 如果 value 为空返回 fallback
 func defaultString(value, fallback string) string {
 	if value == "" {
 		return fallback

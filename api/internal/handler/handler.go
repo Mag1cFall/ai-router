@@ -1,3 +1,4 @@
+// HTTP 路由注册和请求处理链：协议检测→路由匹配→代理转发→响应回写
 package handler
 
 import (
@@ -22,6 +23,7 @@ const (
 	ctxResponseKey = "proxy_response"
 )
 
+// RegisterRoutes 注册健康检查、管理 API 和代理 NoRoute 链路
 func RegisterRoutes(r *gin.Engine, cfg *config.Config) {
 	logs := newRequestLogStore(requestLogCapacity)
 	r.Use(requestLoggingMiddleware(logs), recoveryMiddleware(), corsMiddleware())
@@ -52,6 +54,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config) {
 	r.NoRoute(detectMiddleware(), resolveMiddleware(cfg), proxyMiddleware(), respondMiddleware())
 }
 
+// detectMiddleware 读取请求体并检测协议类型、模型名、是否流式，写入 context
 func detectMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		body, err := io.ReadAll(c.Request.Body)
@@ -77,6 +80,7 @@ func detectMiddleware() gin.HandlerFunc {
 	}
 }
 
+// resolveMiddleware 根据模型名匹配 Provider 并写入 context
 func resolveMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		model, _ := c.Get(ctxModelKey)
@@ -90,6 +94,7 @@ func resolveMiddleware(cfg *config.Config) gin.HandlerFunc {
 	}
 }
 
+// proxyMiddleware 调用 proxy.Forward 将请求转发到上游 Provider，并写入响应对象
 func proxyMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		body, _ := c.Get(ctxBodyKey)
@@ -124,6 +129,7 @@ func proxyMiddleware() gin.HandlerFunc {
 	}
 }
 
+// respondMiddleware 注入上游响应头并回写身体，流式响应自动 flush
 func respondMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		value, ok := c.Get(ctxResponseKey)
@@ -149,6 +155,7 @@ func respondMiddleware() gin.HandlerFunc {
 	}
 }
 
+// flushWriter 包装每次 Write 后自动 Flush，用于 SSE 流式响应
 type flushWriter struct {
 	gin.ResponseWriter
 }

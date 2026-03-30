@@ -1,3 +1,4 @@
+// 程序入口：加载配置、启动 HTTP 服务并监听优雅关闭信号
 package main
 
 import (
@@ -18,6 +19,7 @@ import (
 )
 
 func main() {
+	// 优先从环境变量读取配置路径，默认 config.yaml
 	configPath := strings.TrimSpace(os.Getenv("AI_ROUTER_CONFIG"))
 	if configPath == "" {
 		configPath = "config.yaml"
@@ -42,6 +44,7 @@ func main() {
 		addr = fmt.Sprintf(":%d", cfg.Server.Port)
 	}
 
+	// 打印已加载的 provider 列表
 	providerNames := make([]string, 0, len(cfg.Providers))
 	for _, provider := range cfg.Providers {
 		providerNames = append(providerNames, fmt.Sprintf("%s(%s)", provider.Name, provider.Protocol))
@@ -78,6 +81,7 @@ func main() {
 	case <-shutdownSignal.Done():
 	}
 
+	// 收到信号后等待 10s 让进行中的请求完成
 	log.Printf("shutdown signal received, stopping server")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

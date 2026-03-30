@@ -1,3 +1,4 @@
+// Gemini 流式响应转换：将 Gemini SSE 分片转换为 OpenAI 和 Claude 流式格式
 package gemini
 
 import (

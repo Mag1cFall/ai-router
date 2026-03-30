@@ -1,3 +1,4 @@
+// Claude 协议转换：将 Claude 请求/响应互转 OpenAI 和 Gemini 格式
 package claude
 
 import (
@@ -8,6 +9,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+// RequestToOpenAI 将 Claude Messages 请求转换为 OpenAI Chat Completions 格式
 func RequestToOpenAI(modelName string, input []byte) []byte {
 	root := gjson.ParseBytes(input)
 	out := map[string]any{
@@ -120,6 +122,7 @@ func RequestToOpenAI(modelName string, input []byte) []byte {
 	return mustJSON(out)
 }
 
+// RequestToGemini 将 Claude Messages 请求转换为 Gemini generateContent 格式
 func RequestToGemini(modelName string, input []byte) []byte {
 	root := gjson.ParseBytes(input)
 	out := map[string]any{}
@@ -194,6 +197,7 @@ func RequestToGemini(modelName string, input []byte) []byte {
 	return mustJSON(out)
 }
 
+// ResponseToOpenAI 将 Claude Messages 响应转换为 OpenAI Chat Completions 响应
 func ResponseToOpenAI(input []byte) []byte {
 	root := gjson.ParseBytes(input)
 	texts := make([]string, 0)
@@ -252,6 +256,7 @@ func ResponseToOpenAI(input []byte) []byte {
 	return mustJSON(out)
 }
 
+// claudeSystemToOpenAIMessage 将 Claude system 字段转换为 OpenAI system 消息
 func claudeSystemToOpenAIMessage(system gjson.Result) any {
 	if !system.Exists() {
 		return nil
@@ -273,6 +278,7 @@ func claudeSystemToOpenAIMessage(system gjson.Result) any {
 	return nil
 }
 
+// claudeSystemToGeminiParts 将 Claude system 字段转换为 Gemini system_instruction parts
 func claudeSystemToGeminiParts(system gjson.Result) []any {
 	parts := make([]any, 0)
 	if !system.Exists() {
@@ -294,6 +300,7 @@ func claudeSystemToGeminiParts(system gjson.Result) []any {
 	return parts
 }
 
+// claudeImageToOpenAIContent 将 Claude image block 转换为 OpenAI image_url 格式
 func claudeImageToOpenAIContent(part gjson.Result) any {
 	source := part.Get("source")
 	sourceType := source.Get("type").String()
@@ -329,6 +336,7 @@ func claudeImageToOpenAIContent(part gjson.Result) any {
 	}
 }
 
+// claudeToolsToOpenAI 将 Claude tools 转换为 OpenAI tools 格式
 func claudeToolsToOpenAI(tools gjson.Result) []any {
 	result := make([]any, 0)
 	for _, tool := range tools.Array() {
@@ -347,6 +355,7 @@ func claudeToolsToOpenAI(tools gjson.Result) []any {
 	return result
 }
 
+// claudeToolResultToOpenAIContent 将 Claude tool_result content 转换为 OpenAI 内容字符串
 func claudeToolResultToOpenAIContent(content gjson.Result) any {
 	if !content.Exists() {
 		return ""
@@ -372,6 +381,7 @@ func claudeToolResultToOpenAIContent(content gjson.Result) any {
 	return content.Value()
 }
 
+// onlyTextParts 判断 parts 列表是否全部为文本类型
 func onlyTextParts(parts []any) bool {
 	for _, part := range parts {
 		item, ok := part.(map[string]any)
@@ -385,6 +395,7 @@ func onlyTextParts(parts []any) bool {
 	return true
 }
 
+// rawJSONString 将 gjson.Result 转为原始 JSON 字符串，空时返回 {}
 func rawJSONString(value gjson.Result) string {
 	if !value.Exists() {
 		return "{}"
@@ -395,6 +406,7 @@ func rawJSONString(value gjson.Result) string {
 	return value.Raw
 }
 
+// mapClaudeStopReasonToOpenAI 将 Claude stop_reason 映射到 OpenAI finish_reason
 func mapClaudeStopReasonToOpenAI(reason string) string {
 	switch reason {
 	case "max_tokens":

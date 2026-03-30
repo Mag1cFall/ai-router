@@ -1,3 +1,4 @@
+// OpenAI 流式响应转换：将 OpenAI SSE 分片转换为 Claude 和 Gemini 流式格式
 package openai
 
 import (
@@ -8,6 +9,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+// openAIClaudeStreamState 跟踪单个 OpenAI->Claude 流的转换状态
 type openAIClaudeStreamState struct {
 	ID               string
 	Model            string
@@ -24,6 +26,7 @@ type openAIClaudeStreamState struct {
 	ToolCallsByIndex map[int]*openAIClaudeToolState
 }
 
+// openAIClaudeToolState 跟踪单个 tool_use block 的积累状态
 type openAIClaudeToolState struct {
 	ID         string
 	Name       string
@@ -32,10 +35,12 @@ type openAIClaudeToolState struct {
 	Pending    strings.Builder
 }
 
+// openAIGeminiStreamState 跟踪单个 OpenAI->Gemini 流的工具调用积累状态
 type openAIGeminiStreamState struct {
 	ToolCallsByIndex map[int]*openAIGeminiToolState
 }
 
+// openAIGeminiToolState 跟踪单个 Gemini functionCall 的积累参数
 type openAIGeminiToolState struct {
 	Name string
 	Args strings.Builder
@@ -50,6 +55,7 @@ var (
 	openAIGeminiActiveKey string
 )
 
+// StreamResponseToClaude 将 OpenAI SSE 分片转换为 Claude 流式事件
 func StreamResponseToClaude(chunk []byte) []byte {
 	openAIClaudeStreamMu.Lock()
 	defer openAIClaudeStreamMu.Unlock()
@@ -230,6 +236,7 @@ func StreamResponseToClaude(chunk []byte) []byte {
 	return []byte(out.String())
 }
 
+// StreamResponseToGemini 将 OpenAI SSE 分片转换为 Gemini 流式响应
 func StreamResponseToGemini(chunk []byte) []byte {
 	openAIGeminiStreamMu.Lock()
 	defer openAIGeminiStreamMu.Unlock()
@@ -343,6 +350,7 @@ func StreamResponseToGemini(chunk []byte) []byte {
 	return mustJSON(out)
 }
 
+// normalizeOpenAIStreamChunk 剥离 "data:" 前缀，返回原始 JSON 和是否为 [DONE]
 func normalizeOpenAIStreamChunk(chunk []byte) ([]byte, bool) {
 	raw := strings.TrimSpace(string(chunk))
 	if raw == "" {

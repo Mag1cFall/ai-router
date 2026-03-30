@@ -1,3 +1,4 @@
+// OpenAI 协议转换：将 OpenAI 请求/响应互转 Claude 和 Gemini 格式
 package openai
 
 import (
@@ -8,6 +9,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+// RequestToGemini 将 OpenAI Chat Completions 请求转换为 Gemini generateContent 格式
 func RequestToGemini(_ string, input []byte) []byte {
 	root := gjson.ParseBytes(input)
 	out := map[string]any{}
@@ -101,6 +103,7 @@ func RequestToGemini(_ string, input []byte) []byte {
 	return mustJSON(out)
 }
 
+// RequestToClaude 将 OpenAI Chat Completions 请求转换为 Claude Messages 格式
 func RequestToClaude(modelName string, input []byte) []byte {
 	root := gjson.ParseBytes(input)
 	out := map[string]any{
@@ -176,6 +179,7 @@ func RequestToClaude(modelName string, input []byte) []byte {
 	return mustJSON(out)
 }
 
+// ResponseToClaude 将 OpenAI Chat Completions 响应转换为 Claude Messages 响应
 func ResponseToClaude(input []byte) []byte {
 	root := gjson.ParseBytes(input)
 	choice := root.Get("choices.0")
@@ -214,6 +218,7 @@ func ResponseToClaude(input []byte) []byte {
 	return mustJSON(out)
 }
 
+// ResponseToGemini 将 OpenAI Chat Completions 响应转换为 Gemini generateContent 响应
 func ResponseToGemini(input []byte) []byte {
 	root := gjson.ParseBytes(input)
 	candidates := make([]any, 0)
@@ -255,6 +260,7 @@ func ResponseToGemini(input []byte) []byte {
 	return mustJSON(out)
 }
 
+// openAIContentToGeminiParts 将 OpenAI content 字段转换为 Gemini parts 数组
 func openAIContentToGeminiParts(content gjson.Result, systemOnly bool) []any {
 	parts := make([]any, 0)
 	switch {
@@ -296,6 +302,7 @@ func openAIContentToGeminiParts(content gjson.Result, systemOnly bool) []any {
 	return parts
 }
 
+// openAIContentToClaudeBlocks 将 OpenAI content 转换为 Claude content blocks
 func openAIContentToClaudeBlocks(content gjson.Result) []any {
 	blocks := make([]any, 0)
 	switch {
@@ -346,6 +353,7 @@ func openAIContentToClaudeBlocks(content gjson.Result) []any {
 	return blocks
 }
 
+// openAIReasoningToGeminiParts 将 reasoning_content 转换为 Gemini thought parts
 func openAIReasoningToGeminiParts(reasoning gjson.Result) []any {
 	parts := make([]any, 0)
 	for _, text := range openAIReasoningTexts(reasoning) {
@@ -354,6 +362,7 @@ func openAIReasoningToGeminiParts(reasoning gjson.Result) []any {
 	return parts
 }
 
+// openAIReasoningToClaudeBlocks 将 reasoning_content 转换为 Claude thinking blocks
 func openAIReasoningToClaudeBlocks(reasoning gjson.Result) []any {
 	blocks := make([]any, 0)
 	for _, text := range openAIReasoningTexts(reasoning) {
@@ -362,6 +371,7 @@ func openAIReasoningToClaudeBlocks(reasoning gjson.Result) []any {
 	return blocks
 }
 
+// openAIReasoningTexts 提取 reasoning_content 中所有文本细节
 func openAIReasoningTexts(reasoning gjson.Result) []string {
 	texts := make([]string, 0)
 	if !reasoning.Exists() {
@@ -386,6 +396,7 @@ func openAIReasoningTexts(reasoning gjson.Result) []string {
 	return texts
 }
 
+// openAIToolsToGemini 将 OpenAI tools 转换为 Gemini functionDeclarations
 func openAIToolsToGemini(tools gjson.Result) []any {
 	declarations := make([]any, 0)
 	for _, tool := range tools.Array() {
@@ -407,6 +418,7 @@ func openAIToolsToGemini(tools gjson.Result) []any {
 	return []any{map[string]any{"functionDeclarations": declarations}}
 }
 
+// openAIToolsToClaude 将 OpenAI tools 转换为 Claude tools 格式
 func openAIToolsToClaude(tools gjson.Result) []any {
 	result := make([]any, 0)
 	for _, tool := range tools.Array() {
@@ -425,6 +437,7 @@ func openAIToolsToClaude(tools gjson.Result) []any {
 	return result
 }
 
+// mapOpenAIToolChoiceToClaude 将 OpenAI tool_choice 映射到 Claude 格式
 func mapOpenAIToolChoiceToClaude(choice gjson.Result) any {
 	if choice.Type == gjson.String {
 		switch choice.String() {
@@ -445,6 +458,7 @@ func mapOpenAIToolChoiceToClaude(choice gjson.Result) any {
 	return nil
 }
 
+// mapOpenAIFinishReasonToClaude 将 OpenAI finish_reason 映射到 Claude stop_reason
 func mapOpenAIFinishReasonToClaude(reason string) string {
 	switch reason {
 	case "stop", "content_filter", "":
@@ -458,6 +472,7 @@ func mapOpenAIFinishReasonToClaude(reason string) string {
 	}
 }
 
+// mapOpenAIFinishReasonToGemini 将 OpenAI finish_reason 映射到 Gemini finishReason
 func mapOpenAIFinishReasonToGemini(reason string) string {
 	switch reason {
 	case "length":
@@ -469,6 +484,7 @@ func mapOpenAIFinishReasonToGemini(reason string) string {
 	}
 }
 
+// parseJSONObjectString 将字符串形式的 JSON 对象解析为 map
 func parseJSONObjectString(raw string) map[string]any {
 	if strings.TrimSpace(raw) == "" {
 		return map[string]any{}
@@ -480,6 +496,7 @@ func parseJSONObjectString(raw string) map[string]any {
 	return out
 }
 
+// normalizeToolResponse 将工具返回内容标准化为字符串或原始对象
 func normalizeToolResponse(content gjson.Result) any {
 	if !content.Exists() {
 		return ""
@@ -490,6 +507,7 @@ func normalizeToolResponse(content gjson.Result) any {
 	return content.Value()
 }
 
+// parseDataURL 解析 data:// URL，返回 MIME 类型、base64 数据和是否成功
 func parseDataURL(raw string) (string, string, bool) {
 	if !strings.HasPrefix(raw, "data:") {
 		return "", "", false
@@ -509,6 +527,7 @@ func parseDataURL(raw string) (string, string, bool) {
 	return mimeType, data, true
 }
 
+// mustJSON 将任意对象序列化为 JSON，失败时返回错误 JSON
 func mustJSON(v any) []byte {
 	data, err := json.Marshal(v)
 	if err != nil {

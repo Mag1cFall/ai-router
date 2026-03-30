@@ -1,3 +1,4 @@
+// 代理转发核心：协议转换、URL 构建、认证头注入、SSE 流式中继
 package proxy
 
 import (
@@ -18,6 +19,7 @@ import (
 	"github.com/tidwall/sjson"
 )
 
+// Request 代理转发请求参数
 type Request struct {
 	IncomingProtocol config.ProviderProtocol
 	Provider         config.Provider
@@ -27,6 +29,7 @@ type Request struct {
 	Timeout          time.Duration
 }
 
+// Error 代理错误，包含操作名、Provider 名和上游状态码
 type Error struct {
 	Op                 string
 	Provider           string
@@ -51,6 +54,7 @@ func (e *Error) Unwrap() error {
 	return e.Err
 }
 
+// Forward 执行完整的代理转发：协议转换→发送请求→响应转换
 func Forward(ctx context.Context, req Request) (*http.Response, error) {
 	body, err := translateRequest(req)
 	if err != nil {
@@ -94,6 +98,7 @@ func Forward(ctx context.Context, req Request) (*http.Response, error) {
 	return translated, nil
 }
 
+// wrapError 封装错误为 *Error
 func wrapError(op string, provider config.Provider, statusCode int, err error) error {
 	if err == nil {
 		return nil
@@ -106,6 +111,7 @@ func wrapError(op string, provider config.Provider, statusCode int, err error) e
 	}
 }
 
+// translateRequest 将入站协议的请求转换为 Provider 协议所需的格式
 func translateRequest(req Request) ([]byte, error) {
 	switch req.IncomingProtocol {
 	case req.Provider.Protocol:
@@ -135,6 +141,7 @@ func translateRequest(req Request) ([]byte, error) {
 	return nil, fmt.Errorf("unsupported request translation: %s -> %s", req.IncomingProtocol, req.Provider.Protocol)
 }
 
+// translateResponse 将 Provider 返回的非流式响应转换为入站协议格式
 func translateResponse(req Request, resp *http.Response) (*http.Response, error) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -179,13 +186,16 @@ func translateResponse(req Request, resp *http.Response) (*http.Response, error)
 	return &newResp, nil
 }
 
+// sseChunkTranslator SSE 分片转换函数类型
 type sseChunkTranslator func([]byte) ([]byte, error)
 
+// streamTranslationKey 流式转换的方向键
 type streamTranslationKey struct {
 	from config.ProviderProtocol
 	to   config.ProviderProtocol
 }
 
+// streamTranslators 预编辑全部流式方向的转换函数映射
 var streamTranslators = map[streamTranslationKey]sseChunkTranslator{
 	{from: config.ProtocolOpenAI, to: config.ProtocolClaude}: wrapStreamFn(openaiproto.StreamResponseToClaude),
 	{from: config.ProtocolOpenAI, to: config.ProtocolGemini}: wrapStreamFn(openaiproto.StreamResponseToGemini),
@@ -194,12 +204,14 @@ var streamTranslators = map[streamTranslationKey]sseChunkTranslator{
 	{from: config.ProtocolGemini, to: config.ProtocolClaude}: wrapStreamFn(geminiproto.StreamResponseToClaude),
 }
 
+// wrapStreamFn 将无错误的分片转换函数包装为 sseChunkTranslator
 func wrapStreamFn(fn func([]byte) []byte) sseChunkTranslator {
 	return func(chunk []byte) ([]byte, error) {
 		return fn(chunk), nil
 	}
 }
 
+// translateStreamResponse 创建流式响应，在独立 goroutine 中实时转换幱找 SSE 分片
 func translateStreamResponse(ctx context.Context, req Request, resp *http.Response) *http.Response {
 	translated := *resp
 	translated.Header = resp.Header.Clone()
@@ -222,6 +234,7 @@ func translateStreamResponse(ctx context.Context, req Request, resp *http.Respon
 	return &translated
 }
 
+// relaySSE 逐行读取 SSE，按空行分割事件并调用转换器后写出
 func relaySSE(ctx context.Context, src io.Reader, dst *io.PipeWriter, translator sseChunkTranslator) error {
 	reader := bufio.NewReader(src)
 	var event bytes.Buffer
@@ -273,10 +286,12 @@ func relaySSE(ctx context.Context, src io.Reader, dst *io.PipeWriter, translator
 	}
 }
 
+// isEventStream 判断 Content-Type 是否为 SSE
 func isEventStream(contentType string) bool {
 	return strings.Contains(strings.ToLower(contentType), "text/event-stream")
 }
 
+// upstreamURL 根据 Provider 协议和模型名构建上游请求 URL
 func upstreamURL(provider config.Provider, modelName string, stream bool) (string, error) {
 	base := strings.TrimRight(provider.Endpoint, "/")
 	if base == "" {
@@ -298,6 +313,7 @@ func upstreamURL(provider config.Provider, modelName string, stream bool) (strin
 	}
 }
 
+// applyAuthHeaders 根据 Provider 协议写入认证头
 func applyAuthHeaders(req *http.Request, provider config.Provider, stream bool) {
 	if provider.APIKey == "" {
 		return
@@ -319,6 +335,7 @@ func applyAuthHeaders(req *http.Request, provider config.Provider, stream bool) 
 	}
 }
 
+// overrideModelIfNeeded 将请求体中的 model 字段替换为路由配置的模型后缀
 func overrideModelIfNeeded(protocol config.ProviderProtocol, modelName string, body []byte) []byte {
 	if len(body) == 0 || modelName == "" {
 		return body
