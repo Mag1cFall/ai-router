@@ -3,15 +3,20 @@ package handler
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Mag1cFall/ai-router/api/internal/config"
 	"github.com/Mag1cFall/ai-router/api/internal/proto/detect"
 	"github.com/Mag1cFall/ai-router/api/internal/proxy"
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
 )
 
 const (
@@ -51,7 +56,130 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config) {
 			"logs":     logs.Snapshot(),
 		})
 	})
-	r.NoRoute(detectMiddleware(), resolveMiddleware(cfg), proxyMiddleware(), respondMiddleware())
+
+	auth := authMiddleware(cfg.Server.APIKeys)
+	models := collectModels(cfg)
+
+	r.GET("/v1/models", auth, func(c *gin.Context) {
+		data := make([]gin.H, 0, len(models))
+		for _, m := range models {
+			data = append(data, gin.H{
+				"id":       m.id,
+				"object":   "model",
+				"created":  m.created,
+				"owned_by": m.ownedBy,
+			})
+		}
+		c.JSON(http.StatusOK, gin.H{"object": "list", "data": data})
+	})
+
+	r.GET("/v1beta/models", auth, func(c *gin.Context) {
+		data := make([]gin.H, 0, len(models))
+		for _, m := range models {
+			data = append(data, gin.H{
+				"name":                        "models/" + m.id,
+				"displayName":                 m.id,
+				"supportedGenerationMethods": []string{"generateContent", "streamGenerateContent"},
+			})
+		}
+		c.JSON(http.StatusOK, gin.H{"models": data})
+	})
+
+	r.NoRoute(auth, detectMiddleware(), resolveMiddleware(cfg), proxyMiddleware(), respondMiddleware())
+}
+
+type modelEntry struct {
+	id      string
+	ownedBy string
+	created int64
+}
+
+var modelsHTTPClient = &http.Client{
+	Timeout: 10 * time.Second,
+	Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	},
+}
+
+func collectModels(cfg *config.Config) []modelEntry {
+	now := time.Now().Unix()
+	var models []modelEntry
+	for _, p := range cfg.Providers {
+		fetched := fetchProviderModels(p)
+		if len(fetched) > 0 {
+			for _, id := range fetched {
+				models = append(models, modelEntry{id: id, ownedBy: p.Name, created: now})
+			}
+			continue
+		}
+		for _, m := range p.Models {
+			models = append(models, modelEntry{id: m, ownedBy: p.Name, created: now})
+		}
+	}
+	return models
+}
+
+func fetchProviderModels(p config.Provider) []string {
+	base := strings.TrimRight(p.Endpoint, "/")
+	var url string
+	var req *http.Request
+	var err error
+
+	switch p.Protocol {
+	case config.ProtocolOpenAI:
+		url = base + "/models"
+		req, err = http.NewRequest(http.MethodGet, url, nil)
+		if err != nil {
+			return nil
+		}
+		if p.APIKey != "" {
+			req.Header.Set("Authorization", "Bearer "+p.APIKey)
+		}
+	case config.ProtocolGemini:
+		url = fmt.Sprintf("%s/models?key=%s", base, p.APIKey)
+		req, err = http.NewRequest(http.MethodGet, url, nil)
+		if err != nil {
+			return nil
+		}
+	default:
+		return nil
+	}
+
+	resp, err := modelsHTTPClient.Do(req)
+	if err != nil {
+		log.Printf("fetch models from %s failed: %v", p.Name, err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("fetch models from %s got status %d", p.Name, resp.StatusCode)
+		return nil
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil
+	}
+
+	var ids []string
+	switch p.Protocol {
+	case config.ProtocolOpenAI:
+		gjson.GetBytes(body, "data.#.id").ForEach(func(_, v gjson.Result) bool {
+			ids = append(ids, v.String())
+			return true
+		})
+	case config.ProtocolGemini:
+		gjson.GetBytes(body, "models.#.name").ForEach(func(_, v gjson.Result) bool {
+			name := v.String()
+			name = strings.TrimPrefix(name, "models/")
+			ids = append(ids, name)
+			return true
+		})
+	}
+
+	log.Printf("fetched %d models from %s", len(ids), p.Name)
+	return ids
 }
 
 // detectMiddleware 读取请求体并检测协议类型、模型名、是否流式，写入 context
@@ -75,7 +203,11 @@ func detectMiddleware() gin.HandlerFunc {
 		c.Set(ctxBodyKey, body)
 		c.Set(ctxProtocolKey, config.ProviderProtocol(protocol))
 		c.Set(ctxModelKey, model)
-		c.Set(ctxStreamKey, detect.IsStreaming(body))
+		stream := detect.IsStreaming(body)
+		if !stream && strings.Contains(c.Request.URL.Path, "streamGenerateContent") {
+			stream = true
+		}
+		c.Set(ctxStreamKey, stream)
 		c.Next()
 	}
 }

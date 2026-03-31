@@ -8,6 +8,8 @@ providers:
     protocol: claude
     endpoint: https://api.anthropic.com
     api_key: sk-ant-example
+    models:
+      - claude-sonnet-4-6
 
   - name: gemini
     protocol: gemini
@@ -26,3 +28,5 @@ server:
   host: ""
   port: 8446
   log_level: info
+  api_keys:
+    - sk-your-router-key

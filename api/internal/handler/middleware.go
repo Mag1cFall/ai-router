@@ -114,6 +114,9 @@ func requestLoggingMiddleware(store *requestLogStore) gin.HandlerFunc {
 			StatusCode: c.Writer.Status(),
 			LatencyMS:  time.Since(startedAt).Milliseconds(),
 		})
+
+		log.Printf("%s %s → %s | model=%s provider=%s status=%d latency=%dms",
+			c.Request.Method, path, protocol, model, provider, c.Writer.Status(), time.Since(startedAt).Milliseconds())
 	}
 }
 
@@ -182,4 +185,40 @@ func stringValue(c *gin.Context, key string) string {
 		return ""
 	}
 	return stringValue
+}
+
+func authMiddleware(apiKeys []string) gin.HandlerFunc {
+	keySet := make(map[string]struct{}, len(apiKeys))
+	for _, k := range apiKeys {
+		if k = strings.TrimSpace(k); k != "" {
+			keySet[k] = struct{}{}
+		}
+	}
+
+	return func(c *gin.Context) {
+		if len(keySet) == 0 {
+			c.Next()
+			return
+		}
+
+		key := ""
+		if auth := c.GetHeader("Authorization"); strings.HasPrefix(auth, "Bearer ") {
+			key = strings.TrimPrefix(auth, "Bearer ")
+		}
+		if key == "" {
+			key = c.GetHeader("x-api-key")
+		}
+		if key == "" {
+			key = c.GetHeader("x-goog-api-key")
+		}
+		if key == "" {
+			key = c.Query("key")
+		}
+
+		if _, ok := keySet[strings.TrimSpace(key)]; !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid api key"})
+			return
+		}
+		c.Next()
+	}
 }

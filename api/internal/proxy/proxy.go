@@ -61,6 +61,13 @@ func Forward(ctx context.Context, req Request) (*http.Response, error) {
 		return nil, wrapError("translate request", req.Provider, 0, err)
 	}
 
+	if req.Stream {
+		switch req.Provider.Protocol {
+		case config.ProtocolOpenAI, config.ProtocolClaude:
+			body, _ = sjson.SetBytes(body, "stream", true)
+		}
+	}
+
 	url, err := upstreamURL(req.Provider, req.ModelName, req.Stream)
 	if err != nil {
 		return nil, wrapError("build upstream url", req.Provider, 0, err)
@@ -180,9 +187,9 @@ func translateResponse(req Request, resp *http.Response) (*http.Response, error)
 	newResp := *resp
 	newResp.Body = io.NopCloser(bytes.NewReader(translated))
 	newResp.ContentLength = int64(len(translated))
-	newResp.Header = resp.Header.Clone()
+	newResp.Header = make(http.Header)
 	newResp.Header.Set("Content-Type", "application/json")
-	newResp.Header.Del("Content-Encoding")
+	newResp.Header.Set("Content-Length", fmt.Sprintf("%d", len(translated)))
 	return &newResp, nil
 }
 
@@ -200,6 +207,13 @@ var streamTranslators = map[streamTranslationKey]sseChunkTranslator{
 	{from: config.ProtocolOpenAI, to: config.ProtocolClaude}: wrapStreamFn(openaiproto.StreamResponseToClaude),
 	{from: config.ProtocolOpenAI, to: config.ProtocolGemini}: wrapStreamFn(openaiproto.StreamResponseToGemini),
 	{from: config.ProtocolClaude, to: config.ProtocolOpenAI}: wrapStreamFn(claudeproto.StreamResponseToOpenAI),
+	{from: config.ProtocolClaude, to: config.ProtocolGemini}: func(chunk []byte) ([]byte, error) {
+		openai := claudeproto.StreamResponseToOpenAI(chunk)
+		if len(openai) == 0 {
+			return nil, nil
+		}
+		return openaiproto.StreamResponseToGemini(openai), nil
+	},
 	{from: config.ProtocolGemini, to: config.ProtocolOpenAI}: wrapStreamFn(geminiproto.StreamResponseToOpenAI),
 	{from: config.ProtocolGemini, to: config.ProtocolClaude}: wrapStreamFn(geminiproto.StreamResponseToClaude),
 }
@@ -307,7 +321,11 @@ func upstreamURL(provider config.Provider, modelName string, stream bool) (strin
 		if stream {
 			action = "streamGenerateContent"
 		}
-		return fmt.Sprintf("%s/models/%s:%s", base, modelName, action), nil
+		u := fmt.Sprintf("%s/models/%s:%s", base, modelName, action)
+		if stream {
+			u += "?alt=sse"
+		}
+		return u, nil
 	default:
 		return "", fmt.Errorf("unsupported provider protocol %q", provider.Protocol)
 	}

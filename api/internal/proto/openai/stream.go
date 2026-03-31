@@ -347,7 +347,11 @@ func StreamResponseToGemini(chunk []byte) []byte {
 	if len(out) == 0 {
 		return nil
 	}
-	return mustJSON(out)
+	var buf strings.Builder
+	buf.WriteString("data: ")
+	buf.Write(mustJSON(out))
+	buf.WriteString("\n\n")
+	return []byte(buf.String())
 }
 
 // normalizeOpenAIStreamChunk 剥离 "data:" 前缀，返回原始 JSON 和是否为 [DONE]

@@ -204,12 +204,13 @@ func ResponseToClaude(input []byte) []byte {
 	}
 
 	out := map[string]any{
-		"id":          root.Get("id").String(),
-		"type":        "message",
-		"role":        "assistant",
-		"model":       root.Get("model").String(),
-		"content":     content,
-		"stop_reason": finishReason,
+		"id":            root.Get("id").String(),
+		"type":          "message",
+		"role":          "assistant",
+		"model":         root.Get("model").String(),
+		"content":       content,
+		"stop_reason":   finishReason,
+		"stop_sequence": nil,
 		"usage": map[string]any{
 			"input_tokens":  root.Get("usage.prompt_tokens").Int(),
 			"output_tokens": root.Get("usage.completion_tokens").Int(),
@@ -247,7 +248,8 @@ func ResponseToGemini(input []byte) []byte {
 	}
 
 	out := map[string]any{
-		"candidates": candidates,
+		"candidates":   candidates,
+		"responseId":   root.Get("id").String(),
 		"usageMetadata": map[string]any{
 			"promptTokenCount":     root.Get("usage.prompt_tokens").Int(),
 			"candidatesTokenCount": root.Get("usage.completion_tokens").Int(),

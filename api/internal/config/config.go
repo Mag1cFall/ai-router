@@ -26,6 +26,7 @@ type Provider struct {
 	Protocol ProviderProtocol `yaml:"protocol" json:"protocol"`
 	Endpoint string           `yaml:"endpoint" json:"endpoint"`
 	APIKey   string           `yaml:"api_key" json:"-"`
+	Models   []string         `yaml:"models" json:"models,omitempty"`
 }
 
 // Route 将模型名称（支持通配符）映射到 Provider
@@ -36,9 +37,10 @@ type Route struct {
 
 // Server HTTP 服务监听配置
 type Server struct {
-	Host     string `yaml:"host" json:"host"`
-	Port     int    `yaml:"port" json:"port"`
-	LogLevel string `yaml:"log_level" json:"log_level"`
+	Host     string   `yaml:"host" json:"host"`
+	Port     int      `yaml:"port" json:"port"`
+	LogLevel string   `yaml:"log_level" json:"log_level"`
+	APIKeys  []string `yaml:"api_keys" json:"-"`
 }
 
 // Config 应用全局配置
