@@ -150,7 +150,7 @@ func fetchProviderModels(p config.Provider) []string {
 		log.Printf("fetch models from %s failed: %v", p.Name, err)
 		return nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("fetch models from %s got status %d", p.Name, resp.StatusCode)
